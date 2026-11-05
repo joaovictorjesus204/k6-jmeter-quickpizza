@@ -1,0 +1,5 @@
+reports/
+*.jtl
+jmeter.log
+k6.exe
+apache-jmeter-*/

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios de desempenho | QuickPizza</title>
+<style>
+  :root { --fundo:#f6f7f9; --cartao:#fff; --texto:#1d2330; --suave:#5b6475; --borda:#e2e5ea; --destaque:#7d64ff; }
+  @media (prefers-color-scheme: dark) { :root { --fundo:#11141a; --cartao:#1a1f28; --texto:#e8ebf0; --suave:#9aa3b2; --borda:#2a3140; --destaque:#9d8bff; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fundo); color:var(--texto); line-height:1.5; }
+  main { max-width:860px; margin:0 auto; padding:40px 16px; }
+  h1 { font-size:1.6rem; margin:0 0 4px; }
+  p.sub { color:var(--suave); margin:0 0 28px; }
+  .grade { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  a.cartao { display:block; background:var(--cartao); border:1px solid var(--borda); border-radius:10px; padding:18px; color:inherit; text-decoration:none; }
+  a.cartao:hover { border-color:var(--destaque); }
+  .tipo { font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--destaque); }
+  h2 { font-size:1.05rem; margin:4px 0 6px; }
+  .cartao p { margin:0; color:var(--suave); font-size:.92rem; }
+  footer { margin-top:32px; color:var(--suave); font-size:.85rem; }
+  footer a { color:var(--destaque); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Relatórios de desempenho do QuickPizza</h1>
+  <p class="sub">Gerados pelo GitHub Actions na última execução. k6 e JMeter, por João Victor de Jesus.</p>
+  <div class="grade">
+    <a class="cartao" href="k6-smoke.html"><span class="tipo">k6</span><h2>Smoke</h2><p>1 usuário por 30 s no ambiente público, com cenários negativos.</p></a>
+    <a class="cartao" href="k6-load.html"><span class="tipo">k6</span><h2>Carga</h2><p>Até 10 usuários simultâneos por 3 min e meio. Uso normal esperado.</p></a>
+    <a class="cartao" href="k6-stress.html"><span class="tipo">k6</span><h2>Estresse</h2><p>Degraus de 50, 100 e 150 usuários até degradar.</p></a>
+    <a class="cartao" href="k6-spike.html"><span class="tipo">k6</span><h2>Pico</h2><p>De 5 para 200 usuários em 10 s e a recuperação.</p></a>
+    <a class="cartao" href="jmeter/index.html"><span class="tipo">JMeter</span><h2>Jornada do cliente</h2><p>10 usuários por 2 min: recomendar, avaliar, consultar e apagar.</p></a>
+  </div>
+  <footer>Código: <a href="https://github.com/joaovictorjesus204/k6-jmeter-quickpizza">github.com/joaovictorjesus204/k6-jmeter-quickpizza</a></footer>
+</main>
+</body>
+</html>

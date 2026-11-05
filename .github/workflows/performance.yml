@@ -1,0 +1,161 @@
+name: Testes de desempenho
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Dias úteis, 9h de Brasília
+    - cron: '0 12 * * 1-5'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  K6_NO_USAGE_REPORT: 'true'
+  JMETER_VERSION: '5.6.3'
+
+jobs:
+  k6:
+    name: k6 (${{ matrix.teste }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # O smoke valida o ambiente público real, com 1 usuário.
+          - teste: smoke
+            alvo: https://quickpizza.grafana.com
+          # Carga, estresse e pico rodam contra uma instância própria do QuickPizza,
+          # criada dentro do runner, para não sobrecarregar o ambiente público.
+          - teste: load
+            alvo: http://localhost:3333
+          - teste: stress
+            alvo: http://localhost:3333
+          - teste: spike
+            alvo: http://localhost:3333
+    services:
+      quickpizza:
+        image: ghcr.io/grafana/quickpizza-local:latest
+        ports:
+          - 3333:3333
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Instalar k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Esperar o QuickPizza local ficar pronto
+        if: startsWith(matrix.alvo, 'http://localhost')
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3333/ready && exit 0
+            sleep 2
+          done
+          echo "QuickPizza não ficou pronto" && exit 1
+
+      - name: Rodar k6 (${{ matrix.teste }})
+        env:
+          K6_WEB_DASHBOARD: 'true'
+          K6_WEB_DASHBOARD_EXPORT: reports/k6-${{ matrix.teste }}.html
+        run: |
+          mkdir -p reports
+          k6 run -e BASE_URL=${{ matrix.alvo }} k6/${{ matrix.teste }}.js
+
+      - name: Guardar relatório
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-${{ matrix.teste }}
+          path: reports
+
+  jmeter:
+    name: JMeter (jornada do cliente)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      quickpizza:
+        image: ghcr.io/grafana/quickpizza-local:latest
+        ports:
+          - 3333:3333
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar JMeter
+        run: |
+          curl -sSL -o jmeter.tgz https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz
+          tar xzf jmeter.tgz
+          echo "$PWD/apache-jmeter-${JMETER_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Esperar o QuickPizza local ficar pronto
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3333/ready && exit 0
+            sleep 2
+          done
+          echo "QuickPizza não ficou pronto" && exit 1
+
+      - name: Rodar JMeter sem interface
+        run: |
+          mkdir -p reports
+          jmeter -n -t jmeter/plano.jmx \
+            -Jprotocolo=http -Jhost=localhost -Jporta=3333 \
+            -Jusuarios=10 -Jrampa=30 -Jduracao=120 \
+            -l reports/jmeter.jtl \
+            -e -o reports/jmeter
+
+      - name: Conferir critério de aceite (até 1% de erros)
+        run: python3 jmeter/verificar_resultados.py reports/jmeter.jtl 1
+
+      - name: Guardar relatório
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jmeter
+          path: reports
+
+  publicar-relatorios:
+    name: Publicar relatórios
+    needs: [k6, jmeter]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Juntar os relatórios
+        uses: actions/download-artifact@v8
+        with:
+          path: site
+          merge-multiple: true
+
+      - name: Página inicial dos relatórios
+        run: cp pages/index.html site/index.html
+
+      - name: Preparar publicação
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
